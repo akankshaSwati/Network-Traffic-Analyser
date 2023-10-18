@@ -1,45 +1,44 @@
 #include <cstdint>
 #include <cstring>
+#include <vector>
 #include <iostream>
 #include <iomanip>
 #include <string> 
 #include <sstream> 
-#include <vector>
-#include <windows.h>
-#include <winsock2.h>
-#include <Ws2tcpip.h>
-#include <iphlpapi.h>
 #include <stdio.h>
 #include <sys/socket.h> 
 #include <netinet/in.h> 
 #include <arpa/inet.h> 
+#include <netpacket/packet.h>
+
+using namespace std;
 
 typedef struct filteredPacket_s{
     int packetNumber;
 
-    mac_addr_t mac_src;
-    mac_addr_t mac_dst;
+    sockaddr_ll mac_src;
+    sockaddr_ll mac_dst;
     int macPacketSize;
     int macDataSize;
     int macHeaderSize;
 
-    ipVersion ipHeaderVersion;
+    // ipVersion ipHeaderVersion; //use later when needed
 
     bool mac_set;
-    ipv4_addr_t ipv4_src;
-    ipv4_addr_t ipv4_dst;
+    in_addr ipv4_src;
+    in_addr ipv4_dst;
     int ipv4PacketSize;
     int ipv4DataSize;
 
     bool ipv4_set;
 
-    ipv6_addr_t ipv6_src;
-    ipv6_addr_t ipv6_dst;
+    in6_addr ipv6_src;
+    in6_addr ipv6_dst;
     int ipv6PacketSize;
     int ipv6DataSize;
     bool ipv6_set;
 
-    ipNextHeaderProtocol next_prot;
+    // ipNextHeaderProtocol next_prot; //use later when needed
 
     uint16_t port_src;
     uint16_t port_dst;
@@ -60,19 +59,37 @@ enum class filterTypeEnum {
 
 typedef struct filter_s{
     vector<filterTypeEnum> type;
-    vector<mac_addr_t> mac;
-    vector<ipv4_addr_t> ipv4;
-    vector<ipv6_addr_t> ipv6;
+    vector<sockaddr_ll> mac;
+    vector<in_addr> ipv4;
+    vector<in6_addr> ipv6;
     vector<uint16_t> port;
     bool applySrc;
     bool applyDst;
 } filter_t;
 
+bool filterTypeCompare(filterTypeEnum &actualType, vector<filterTypeEnum> type){
+    //Write func Description here
+}
+
+bool macsChecker(filteredPacket_t& actualPacket, filter_t& filter){
+    //Write func Description here
+}
+
+bool ipv4Checker(filteredPacket_t& actualPacket, filter_t& filter){
+    //Write func Description here
+}
+
+bool ipv6Checker(filteredPacket_t& actualPacket, filter_t& filter){
+    //Write func Description here
+}
+
+bool portChecker(filteredPacket_t& actualPacket, filter_t& filter){
+    //Write func Description here
+}
+
 bool filterChecker(filter_t& filter, filteredPacket_t& actualPacket, filterTypeEnum actualType,
                    vector<filteredPacket_t>& filteredPacketVec) {
     if(filterTypeCompare(actualType, filter.type)) {
-        //cout << actualPacket.packetNumber << ": Looking on this type of header: " << filterTypeGiveString(actualType) << endl;
-
         switch (actualType) {
             case filterTypeEnum::mac:
                 if(macsChecker(actualPacket, filter))
