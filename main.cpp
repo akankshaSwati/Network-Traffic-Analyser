@@ -40,8 +40,7 @@ int main(int argc, const char* argv[])
 	printf("Starting...\n");
 	
 	int sock_raw = socket( AF_PACKET , SOCK_RAW , htons(ETH_P_ALL)) ;
-	//setsockopt(sock_raw , SOL_SOCKET , SO_BINDTODEVICE , "eth0" , strlen("eth0")+ 1 );
-	
+	//setsockopt(sock_raw , SOL_SOCKET , SO_BINDTODEVICE , "eth0" , strlen("eth0")+ 1 );git
 	if(sock_raw < 0)
 	{
 		//Print the error with proper message
