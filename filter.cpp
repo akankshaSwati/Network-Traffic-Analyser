@@ -10,6 +10,7 @@
 #include <netinet/in.h> 
 #include <arpa/inet.h> 
 #include <netpacket/packet.h>
+#include <pcap.h>
 
 using namespace std;
 
@@ -67,24 +68,93 @@ typedef struct filter_s{
     bool applyDst;
 } filter_t;
 
+void process_packet(const struct pcap_pkthdr* header, const u_char* packet_data) {
+    // You can process or print the packet data here
+    printf("Packet Length: %d\n", header->len);
+
+    // Print the packet data as hexadecimal bytes
+    for (int i = 0; i < header->len; i++) {
+        printf("%02X ", packet_data[i]);
+        if ((i + 1) % 16 == 0) {
+            printf("\n"); // Newline after every 16 bytes
+        }
+    }
+    printf("\n");
+}
+
+bool pcap_analyser_tcp(){
+    pcap_t* handle;
+    char errbuf[PCAP_ERRBUF_SIZE];
+
+    handle = pcap_open_offline("custom_packets.pcap", errbuf);
+    if (handle == NULL) {
+        fprintf(stderr, "Error opening pcap file: %s\n", errbuf);
+        return 1;
+    }
+
+    struct bpf_program fp;
+    char filter_exp[] = "tcp port 80";
+
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        fprintf(stderr, "Error compiling filter: %s\n", pcap_geterr(handle));
+        return 1;
+    }
+
+    if (pcap_setfilter(handle, &fp) == -1) {
+        fprintf(stderr, "Error setting filter: %s\n", pcap_geterr(handle));
+        return 1;
+    }
+
+    struct pcap_pkthdr* header;
+    const u_char* packet;
+
+    while (int returnValue = pcap_next_ex(handle, &header, &packet)) {
+        if (returnValue == 1) {
+            // cout<<"HI"<<endl;
+            // cout<<packet<<endl;
+            // Process packet here
+            // 'header' contains packet metadata, and 'packet' contains packet data
+        } else if (returnValue == 0) {
+
+            // Timeout elapsed (if required)
+        } else if (returnValue == -1) {
+            fprintf(stderr, "Error reading the next packet: %s\n", pcap_geterr(handle));
+            break;
+        } else if (returnValue == -2) {
+            // End of file reached
+            // cout<<"hoho"<<endl;
+            process_packet(header, packet);
+            break;
+        }
+    }
+    pcap_close(handle);
+    return 1;
+}
+
+
 bool filterTypeCompare(filterTypeEnum &actualType, vector<filterTypeEnum> type){
     //Write func Description here
+    return 0;
 }
 
 bool macsChecker(filteredPacket_t& actualPacket, filter_t& filter){
     //Write func Description here
+    return 0;
 }
 
 bool ipv4Checker(filteredPacket_t& actualPacket, filter_t& filter){
     //Write func Description here
+    return 0;
 }
 
 bool ipv6Checker(filteredPacket_t& actualPacket, filter_t& filter){
     //Write func Description here
+    return 0;
 }
 
 bool portChecker(filteredPacket_t& actualPacket, filter_t& filter){
     //Write func Description here
+    return 0;
 }
 
 bool filterChecker(filter_t& filter, filteredPacket_t& actualPacket, filterTypeEnum actualType,
@@ -115,4 +185,8 @@ bool filterChecker(filter_t& filter, filteredPacket_t& actualPacket, filterTypeE
         return true;
     }
     return false;
+}
+
+int main(){
+    bool k=pcap_analyser_tcp();
 }
