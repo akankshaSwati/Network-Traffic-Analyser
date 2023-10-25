@@ -4,6 +4,8 @@
 #include <pcap.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <limits>
+#include <cstring>
 
 using namespace std;
 
