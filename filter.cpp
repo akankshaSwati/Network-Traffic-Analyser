@@ -80,6 +80,7 @@ void process_packet(const struct pcap_pkthdr* header, const u_char* packet_data)
         }
     }
     printf("\n");
+    printf("\n");
 }
 
 bool pcap_analyser_tcp(){
@@ -109,9 +110,10 @@ bool pcap_analyser_tcp(){
     const u_char* packet;
 
     while (int returnValue = pcap_next_ex(handle, &header, &packet)) {
+        
         if (returnValue == 1) {
-            // cout<<"HI"<<endl;
-            // cout<<packet<<endl;
+            cout<<"TCP PACKET:"<<endl;
+            process_packet(header, packet);
             // Process packet here
             // 'header' contains packet metadata, and 'packet' contains packet data
         } else if (returnValue == 0) {
@@ -122,8 +124,54 @@ bool pcap_analyser_tcp(){
             break;
         } else if (returnValue == -2) {
             // End of file reached
-            // cout<<"hoho"<<endl;
+            break;
+        }
+    }
+    pcap_close(handle);
+    return 1;
+}
+
+bool pcap_analyser_udp(){
+    pcap_t* handle;
+    char errbuf[PCAP_ERRBUF_SIZE];
+
+    handle = pcap_open_offline("custom_packets.pcap", errbuf);
+    if (handle == NULL) {
+        fprintf(stderr, "Error opening pcap file: %s\n", errbuf);
+        return 1;
+    }
+
+    struct bpf_program fp;
+    char filter_exp[] = "udp port 53";
+
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        fprintf(stderr, "Error compiling filter: %s\n", pcap_geterr(handle));
+        return 1;
+    }
+
+    if (pcap_setfilter(handle, &fp) == -1) {
+        fprintf(stderr, "Error setting filter: %s\n", pcap_geterr(handle));
+        return 1;
+    }
+
+    struct pcap_pkthdr* header;
+    const u_char* packet;
+
+    while (int returnValue = pcap_next_ex(handle, &header, &packet)) {
+        
+        if (returnValue == 1) {
+            cout<<"UDP PACKET:"<<endl;
             process_packet(header, packet);
+            // Process packet here
+            // 'header' contains packet metadata, and 'packet' contains packet data
+        } else if (returnValue == 0) {
+
+            // Timeout elapsed (if required)
+        } else if (returnValue == -1) {
+            fprintf(stderr, "Error reading the next packet: %s\n", pcap_geterr(handle));
+            break;
+        } else if (returnValue == -2) {
+            // End of file reached
             break;
         }
     }
@@ -188,5 +236,6 @@ bool filterChecker(filter_t& filter, filteredPacket_t& actualPacket, filterTypeE
 }
 
 int main(){
-    bool k=pcap_analyser_tcp();
+    pcap_analyser_tcp();
+    pcap_analyser_udp();
 }
