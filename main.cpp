@@ -49,11 +49,10 @@ int main(int argc, char* argv[]) {
             }
             else
             {
-                filters+=" ";
                 for (int i = 1; i < argc; i++) 
                 {
-                    filters= filters+ argv[i];
                     filters+=" ";
+                    filters= filters+ argv[i];
                 }            
             }
             if(std::isspace(filters.back()))
