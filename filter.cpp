@@ -534,14 +534,14 @@ void filter_packets_by_source_and_dest_ip(const char* pcap_file, const char* sou
 
 int main() {
     string s;
-    cout<<"Enter the name with extension of the .pcap file you want to analyze."
+    cout<<"Enter the name with extension of the .pcap file you want to analyze."<<endl;
     cin>>s;
     cout<<"Analyzing "<<s<< "........"<<endl;
     const char* pcap_file = s.c_str();
     const char* source_ip = "10.38.1.54";
     const char* dest_ip = "239.255.255.250";
-    bool show_packet_data = 0;
+    bool show_packet_data = 1;
     // filter_packets_by_dest_ip(pcap_file, dest_ip, show_packet_data);
-    filter_packets_by_source_and_dest_ip(pcap_file, source_ip, dest_ip, 1);
+    filter_packets_by_source_and_dest_ip(pcap_file, source_ip, dest_ip, show_packet_data);
     return 0;
 }
