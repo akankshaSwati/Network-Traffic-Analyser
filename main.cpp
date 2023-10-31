@@ -10,7 +10,7 @@ bool shouldRun = true;  // Initialize a flag
 void SignalHandler(int signum) {
     if (signum == SIGINT) {
         shouldRun = false;
-        printf("Sniffer Executed Successful!!!\r\n");
+        printf("Sniffer Executeion Successful!!!\r\n");
         return;
     }
 }
@@ -30,10 +30,22 @@ int main(int argc, char* argv[]) {
             int compileSnifferResult = system(compileSniffer);
             if (compileSnifferResult == 0) 
             {
-                std::cout << "Sniffer compilation successful." << std::endl;
-
+                std::cout << "Sniffer compilation successful." << std::endl;               
+                string filters ="./sniffer";
+                if(argc<2)
+                {
+                    std::cout << "No filter criteria found. All the packets in the pcap file will be displayed." << std::endl;
+                }
+                else
+                {
+                    for (int i = 1; i < argc; i++) 
+                    {
+                        filters+=" ";
+                        filters= filters+ argv[i];
+                    }            
+                }
+                const char* runSniffer = filters.c_str();
                 // Run the compiled external_program
-                const char* runSniffer = "./sniffer";
                 int runSnifferResult = system(runSniffer);
                 if (runSnifferResult == 0 || shouldRun==0) 
                 {
@@ -58,7 +70,6 @@ int main(int argc, char* argv[]) {
             if (compileFilterResult == 0) 
             {
                 std::cout << "Filter compilation successful." << std::endl;
-
                 string filters ="./filter";
                 if(argc<2)
                 {
