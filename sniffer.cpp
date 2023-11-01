@@ -19,13 +19,15 @@
 #include<signal.h>
 #include<iostream>
 #include<string>
+#include<cstdint>
 
 bool sniffPackets = true;
 
 void SignalHandler(int signum) {
     if (signum == SIGINT) {
         sniffPackets = false;
-        printf("Received SIGINT. Stopping the capturing of packets . . . . .\r\n");
+		printf("_______________________________________________________________________________\r\n");
+        printf("Received SIGINT!!\nSniffing halted.\n");
         return;
     }
 }
@@ -46,10 +48,19 @@ struct FilterParams{
 	{}
 };
 
+void ProcessPacket(unsigned char* , int, FilterParams*);
+bool print_ip_header(unsigned char* , int, FilterParams*);
+void print_tcp_packet(unsigned char * , int, FilterParams*);
+void print_udp_packet(unsigned char * , int, FilterParams*);
+void print_icmp_packet(unsigned char* , int, FilterParams*);
+void PrintData (unsigned char* , int);
+
 void ProcessPacket(unsigned char* buffer, int size, FilterParams* f_params){
 
 	//Get the IP Header part of this packet , excluding the ethernet header
 	struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
+
+	// std::cout<<f_params->protocol.first<<","<<f_params->protocol.second<<" "<<f_params->source_ip<<"("<<f_params->source_port<<") "<<f_params->destination_ip<<"("<<f_params->destination_port<<")"<<std::endl;
 	
 	++total;
 	switch (iph->protocol) //Check the Protocol and do accordingly...
@@ -58,7 +69,7 @@ void ProcessPacket(unsigned char* buffer, int size, FilterParams* f_params){
 			++icmp;
 			if(f_params->protocol.second=="all" || f_params->protocol.second=="icmp")
 			{
-				print_icmp_packet(buffer , size);
+				print_icmp_packet(buffer , size, f_params);
 			}
 			break;
 		
@@ -72,17 +83,17 @@ void ProcessPacket(unsigned char* buffer, int size, FilterParams* f_params){
 		
 		case 6:  //TCP Protocol
 			++tcp;
-			if(f_params->protocol.second=="all" || f_params->protocol.second=="icmp")
+			if(f_params->protocol.second=="all" || f_params->protocol.second=="tcp")
 			{
-				print_tcp_packet(buffer , size);
+				print_tcp_packet(buffer , size, f_params);
 			}
 			break;
 		
 		case 17: //UDP Protocol
 			++udp;
-			if(f_params->protocol.second=="all" || f_params->protocol.second=="icmp")
+			if(f_params->protocol.second=="all" || f_params->protocol.second=="udp")
 			{
-				print_udp_packet(buffer , size);
+				print_udp_packet(buffer , size, f_params);
 			}
 			break;
 		
@@ -90,6 +101,7 @@ void ProcessPacket(unsigned char* buffer, int size, FilterParams* f_params){
 			++others;
 			break;
 	}
+
 	printf("TCP : %d   UDP : %d   ICMP : %d   IGMP : %d   Others : %d   Total : %d\r", tcp , udp , icmp , igmp , others , total);
 }
 
@@ -104,9 +116,9 @@ void print_ethernet_header(unsigned char* Buffer, int Size)
 	fprintf(logfile , "   |-Protocol            : %u \n",(unsigned short)eth->h_proto);
 }
 
-void print_ip_header(unsigned char* Buffer, int Size)
+bool print_ip_header(unsigned char* Buffer, int Size, FilterParams* f_params)
 {
-	print_ethernet_header(Buffer , Size);
+	// print_ethernet_header(Buffer , Size);
   
 	unsigned short iphdrlen;
 		
@@ -118,6 +130,32 @@ void print_ip_header(unsigned char* Buffer, int Size)
 	
 	memset(&dest, 0, sizeof(dest));
 	dest.sin_addr.s_addr = iph->daddr;
+
+	// std::cout<<"f_params->source_ip!=inet_ntoa(source.sin_addr) - "<<(f_params->source_ip!=inet_ntoa(source.sin_addr))<<std::endl;
+	// if(f_params->source_ip!=inet_ntoa(source.sin_addr) || f_params->destination_ip!=inet_ntoa(dest.sin_addr)) return false;
+	if(f_params->source_ip!="any" && f_params->source_ip!=inet_ntoa(source.sin_addr)) return false;
+	if(f_params->destination_ip!="any" && f_params->destination_ip!=inet_ntoa(dest.sin_addr)) return false;
+
+	switch (iph->protocol)
+	{
+		case 1:  //ICMP Protocol
+			fprintf(logfile , "\n\n***********************ICMP Packet*************************\n");
+			break;
+		case 2:  //IGMP Protocol
+			fprintf(logfile , "\n\n***********************IGMP Packet*************************\n");
+			break;
+		case 6:  //TCP Protocol
+			fprintf(logfile , "\n\n***********************TCP Packet*************************\n");
+			break;
+		case 17: //UDP Protocol
+			fprintf(logfile , "\n\n***********************UDP Packet*************************\n");
+			break;
+		default: //Some Other Protocol like ARP etc.
+			fprintf(logfile , "\n\n***********************Packet*************************\n");
+			break;
+	}
+
+	print_ethernet_header(Buffer , Size);
 	
 	fprintf(logfile , "\n");
 	fprintf(logfile , "IP Header\n");
@@ -134,9 +172,11 @@ void print_ip_header(unsigned char* Buffer, int Size)
 	fprintf(logfile , "   |-Checksum : %d\n",ntohs(iph->check));
 	fprintf(logfile , "   |-Source IP        : %s\n",inet_ntoa(source.sin_addr));
 	fprintf(logfile , "   |-Destination IP   : %s\n",inet_ntoa(dest.sin_addr));
+
+	return true;
 }
 
-void print_tcp_packet(unsigned char* Buffer, int Size)
+void print_tcp_packet(unsigned char* Buffer, int Size, FilterParams* f_params)
 {
 	unsigned short iphdrlen;
 	
@@ -146,11 +186,11 @@ void print_tcp_packet(unsigned char* Buffer, int Size)
 	struct tcphdr *tcph=(struct tcphdr*)(Buffer + iphdrlen + sizeof(struct ethhdr));
 			
 	int header_size =  sizeof(struct ethhdr) + iphdrlen + tcph->doff*4;
+		
+	if(!print_ip_header(Buffer, Size, f_params)) return;
+	if(f_params->source_port && f_params->source_port!=static_cast<int>(ntohs(tcph->source))) return;
+	if(f_params->destination_port && f_params->destination_port!=static_cast<int>(ntohs(tcph->dest))) return;
 	
-	fprintf(logfile , "\n\n***********************TCP Packet*************************\n");	
-		
-	print_ip_header(Buffer,Size);
-		
 	fprintf(logfile , "\n");
 	fprintf(logfile , "TCP Header\n");
 	fprintf(logfile , "   |-Source Port      : %u\n",ntohs(tcph->source));
@@ -185,7 +225,7 @@ void print_tcp_packet(unsigned char* Buffer, int Size)
 	fprintf(logfile , "\n###########################################################");
 }
 
-void print_udp_packet(unsigned char *Buffer , int Size)
+void print_udp_packet(unsigned char *Buffer , int Size, FilterParams* f_params)
 {
 	
 	unsigned short iphdrlen;
@@ -197,9 +237,9 @@ void print_udp_packet(unsigned char *Buffer , int Size)
 	
 	int header_size =  sizeof(struct ethhdr) + iphdrlen + sizeof udph;
 	
-	fprintf(logfile , "\n\n***********************UDP Packet*************************\n");
-	
-	print_ip_header(Buffer,Size);			
+	if(!print_ip_header(Buffer, Size, f_params)) return;
+	if(f_params->source_port && f_params->source_port!=static_cast<int>(ntohs(udph->source))) return;
+	if(f_params->destination_port && f_params->destination_port!=static_cast<int>(ntohs(udph->dest))) return;
 	
 	fprintf(logfile , "\nUDP Header\n");
 	fprintf(logfile , "   |-Source Port      : %d\n" , ntohs(udph->source));
@@ -222,7 +262,7 @@ void print_udp_packet(unsigned char *Buffer , int Size)
 	fprintf(logfile , "\n###########################################################");
 }
 
-void print_icmp_packet(unsigned char* Buffer , int Size)
+void print_icmp_packet(unsigned char* Buffer , int Size, FilterParams* f_params)
 {
 	unsigned short iphdrlen;
 	
@@ -233,9 +273,7 @@ void print_icmp_packet(unsigned char* Buffer , int Size)
 	
 	int header_size =  sizeof(struct ethhdr) + iphdrlen + sizeof icmph;
 	
-	fprintf(logfile , "\n\n***********************ICMP Packet*************************\n");	
-	
-	print_ip_header(Buffer , Size);
+	if(!print_ip_header(Buffer, Size, f_params)) return;
 			
 	fprintf(logfile , "\n");
 		
@@ -253,8 +291,8 @@ void print_icmp_packet(unsigned char* Buffer , int Size)
 	
 	fprintf(logfile , "   |-Code : %d\n",(unsigned int)(icmph->code));
 	fprintf(logfile , "   |-Checksum : %d\n",ntohs(icmph->checksum));
-	//fprintf(logfile , "   |-ID       : %d\n",ntohs(icmph->id));
-	//fprintf(logfile , "   |-Sequence : %d\n",ntohs(icmph->sequence));
+	// fprintf(logfile , "   |-ID       : %d\n",ntohs(icmph->id));
+	// fprintf(logfile , "   |-Sequence : %d\n",ntohs(icmph->sequence));
 	fprintf(logfile , "\n");
 
 	fprintf(logfile , "IP Header\n");
@@ -318,6 +356,11 @@ void PrintData (unsigned char* data , int Size)
 	}
 }
 
+void toLower(std::string &s){
+	int l = s.length();
+	for(int i=0; i<l; i++) s[i]=tolower(s[i]);
+}
+
 int main(int argc, char* argv[])
 {
 	int proto;
@@ -331,42 +374,56 @@ int main(int argc, char* argv[])
 
 	logfile = fopen("analysis.txt","w");
 	if(logfile==NULL){
-		printf("Unable to create analysis.txt file.");
-		return 1;
+		perror("Unable to create analysis.txt file");
+		exit(EXIT_FAILURE);
 	}
 	printf("Sniffing...\n");
 	
 	FilterParams* f_params = new FilterParams();
 	if(argc>1)
 	{
+		// for(int j=1; j<argc; j++) std::cout<<argv[j]<<" "<<std::endl;
 		int i=1;
 		while(i<argc){
-			if(argv[i++]=="-i"){
-				if(argv[i][0]!='-'){
+			// std::cout<<"---"<<argv[i]<<std::endl;
+			// std::cout<<"..."<<(strcmp(argv[i++],"-i")==0)<<std::endl;
+			// std::cout<<"- - -"<<f_params->protocol.first<<","<<f_params->protocol.second<<" "<<f_params->source_ip<<"("<<f_params->source_port<<") "<<f_params->destination_ip<<"("<<f_params->destination_port<<")"<<std::endl;
+
+			if(strcmp(argv[i],"-i")==0){
+				i++;
+				if(i<argc && argv[i][0]!='-'){
 					f_params->protocol.first = argv[i++];
-					transform(f_params->protocol.first.begin(), f_params->protocol.first.end(), f_params->protocol.first.begin(), ::tolower);
+					toLower(f_params->protocol.first);
+					// std::cout<<f_params->protocol.first<<","<<f_params->protocol.second<<" "<<f_params->source_ip<<"("<<f_params->source_port<<") "<<f_params->destination_ip<<"("<<f_params->destination_port<<")"<<std::endl;
 				}
-				if(argv[i][0]!='-'){
+				if(i<argc && argv[i][0]!='-'){
 					f_params->protocol.second = argv[i++];
-					transform(f_params->protocol.second.begin(), f_params->protocol.second.end(), f_params->protocol.second.begin(), ::tolower);
+					toLower(f_params->protocol.second);
+					// std::cout<<f_params->protocol.first<<","<<f_params->protocol.second<<" "<<f_params->source_ip<<"("<<f_params->source_port<<") "<<f_params->destination_ip<<"("<<f_params->destination_port<<")"<<std::endl;
 				}
 			}
-			else if(argv[i++]=="-s"){
-				if(argv[i][0]!='-'){
+			else if(strcmp(argv[i],"-s")==0){
+				i++;
+				if(i<argc && argv[i][0]!='-'){
 					f_params->source_ip = argv[i++];
-					transform(f_params->source_ip.begin(), f_params->source_ip.end(), f_params->source_ip.begin(), ::tolower);
+					toLower(f_params->source_ip);
+					// std::cout<<f_params->protocol.first<<","<<f_params->protocol.second<<" "<<f_params->source_ip<<"("<<f_params->source_port<<") "<<f_params->destination_ip<<"("<<f_params->destination_port<<")"<<std::endl;
 				}
-				if(argv[i][0]!='-'){
+				if(i<argc && argv[i][0]!='-'){
 					f_params->source_port = std::stoi(argv[i++]);
+					// std::cout<<f_params->protocol.first<<","<<f_params->protocol.second<<" "<<f_params->source_ip<<"("<<f_params->source_port<<") "<<f_params->destination_ip<<"("<<f_params->destination_port<<")"<<std::endl;
 				}
 			}
-			else if(argv[i++]=="-d"){
-				if(argv[i][0]!='-'){
+			else if(strcmp(argv[i],"-d")==0){
+				i++;
+				if(i<argc && argv[i][0]!='-'){
 					f_params->destination_ip = argv[i++];
-					transform(f_params->destination_ip.begin(), f_params->destination_ip.end(), f_params->destination_ip.begin(), ::tolower);
+					toLower(f_params->destination_ip);
+					// std::cout<<f_params->protocol.first<<","<<f_params->protocol.second<<" "<<f_params->source_ip<<"("<<f_params->source_port<<") "<<f_params->destination_ip<<"("<<f_params->destination_port<<")"<<std::endl;
 				}
-				if(argv[i][0]!='-'){
+				if(i<argc && argv[i][0]!='-'){
 					f_params->destination_port = std::stoi(argv[i++]);
+					// std::cout<<f_params->protocol.first<<","<<f_params->protocol.second<<" "<<f_params->source_ip<<"("<<f_params->source_port<<") "<<f_params->destination_ip<<"("<<f_params->destination_port<<")"<<std::endl;
 				}
 			}
 			else{
@@ -389,7 +446,7 @@ int main(int argc, char* argv[])
 		proto = ETH_P_ARP;
 	}
 	
-	if(sock_raw = socket(AF_PACKET , SOCK_RAW , htons(proto)) < 0){
+	if((sock_raw = socket(AF_PACKET , SOCK_RAW , htons(proto))) < 0){
 		perror("Socket Error");
 		exit(EXIT_FAILURE);
 	}
@@ -397,37 +454,49 @@ int main(int argc, char* argv[])
 	bzero(&source_addr, sizeof(source_addr));
 	bzero(&dest_addr, sizeof(dest_addr));
 
-	if(f_params->destination_ip != "any"){
-		dest_addr.sin_family = AF_PACKET;
-		if(inet_pton(AF_PACKET, (char *)(f_params->destination_ip.c_str()), &dest_addr.sin_addr) < 1) {
-			perror("Invalid destination ip address: Address not supported");
-        	exit(EXIT_FAILURE);
-    	}
-		if(f_params->destination_port){
-			dest_addr.sin_port = htons(f_params->destination_port);
-		}
+	// if(f_params->destination_ip != "any"){
+	// 	dest_addr.sin_family = AF_PACKET;
+	// 	if((inet_pton(AF_PACKET, (char *)(f_params->destination_ip.c_str()), &dest_addr.sin_addr)) < 1) {
+	// 		perror("Invalid destination ip address: Address not supported");
+    //     	exit(EXIT_FAILURE);
+    // 	}
+	// 	if(f_params->destination_port){
+	// 		dest_addr.sin_port = htons(f_params->destination_port);
+	// 	}
 
-		if(bind(sock_raw, (struct sockaddr*)(&dest_addr), sizeof(dest_addr)) < 0){
-			perror("Binding to destination ip failed");
-        	exit(EXIT_FAILURE);
-		}
-	}
+	// 	if((bind(sock_raw, (struct sockaddr*)(&dest_addr), sizeof(dest_addr))) < 0){
+	// 		perror("Binding to destination ip failed");
+    //     	exit(EXIT_FAILURE);
+	// 	}
+	// }
 
-	if(f_params->source_ip != "any"){
-		source_addr.sin_family = AF_PACKET;
-		if(inet_pton(AF_PACKET, (char *)(f_params->source_ip.c_str()), &source_addr.sin_addr) < 1) {
-			perror("Invalid source ip address: Address not supported");
-        	exit(EXIT_FAILURE);
-    	}
-		if(f_params->source_port){
-			source_addr.sin_port = htons(f_params->source_port);
-		}
+	// std::cout<<f_params->protocol.first<<","<<f_params->protocol.second<<" "<<f_params->source_ip<<"("<<f_params->source_port<<") "<<f_params->destination_ip<<"("<<f_params->destination_port<<")"<<std::endl;
 
-		if(connect(sock_raw, (struct sockaddr*)(&source_addr), sizeof(source_addr)) < 0){
-			perror("Connectinng to source ip failed");
-			exit(EXIT_FAILURE);
-		}
-	}
+	// if(f_params->source_ip != "any"){
+	// 	int source_proto;
+	// 	if(f_params->protocol.first=="all" || f_params->protocol.first=="ipv4"){
+	// 		source_proto = AF_INET;
+	// 	}
+	// 	if(f_params->protocol.first=="ipv6"){
+	// 		source_proto = AF_INET6;
+	// 	}
+
+	// 	source_addr.sin_family = AF_INET;
+	// 	if((inet_pton(AF_INET, (char *)(f_params->source_ip.c_str()), &source_addr.sin_addr)) < 1) {
+	// 		perror("Invalid source ip address: Address not supported\n");
+    //     	exit(EXIT_FAILURE);
+    // 	}
+	// 	if(f_params->source_port){
+	// 		source_addr.sin_port = htons(f_params->source_port);
+	// 	}
+
+	// 	if((connect(sock_raw, (struct sockaddr*)(&source_addr), sizeof(source_addr))) < 0){
+	// 		perror("Connecting to source ip failed");
+	// 		exit(EXIT_FAILURE);
+	// 	}
+	// }
+
+	// std::cout<<f_params->source_ip<<" "<<f_params->source_port
 
 	while(sniffPackets){
 		source_addr_size = sizeof(source_addr);
@@ -435,14 +504,14 @@ int main(int argc, char* argv[])
 		data_size = recvfrom(sock_raw , buffer , 65536 , 0 , (struct sockaddr*)&source_addr , (socklen_t*)&source_addr_size);
 
 		if(data_size < 0){
-			perror("Recvfrom error , failed to get packets\n");
+			perror("Failed to receive packets\n");
 			exit(EXIT_FAILURE);
 		}
 		
 		ProcessPacket(buffer , data_size, f_params);
 	}
     close(sock_raw);
-	printf(". . . . . Packets processed and analysis file generated . . . . .\n\r");
+	printf("TCP : %d   UDP : %d   ICMP : %d   IGMP : %d   Others : %d   Total : %d\n", tcp , udp , icmp , igmp , others , total);
 	printf("B-Bye!!\n");
 	return 0;
 }
