@@ -153,11 +153,11 @@ bool pcap_analyser_tcp(const char* pcap_file, bool show_packet_data){
     while (int returnValue = pcap_next_ex(handle, &header, &packet)) {
         
         if (returnValue == 1) {
-            cout<<"----------------------------------------------------------------------------";
+            cout<<"----------------------------------------------------------------------------"<<endl;
             cout<<"TCP PACKET:"<<endl;
             extract_ip_info(header, packet);
             if(show_packet_data) process_packet(header,packet);
-            cout<<"----------------------------------------------------------------------------";
+            cout<<"----------------------------------------------------------------------------"<<endl;
             // Process packet here
             // 'header' contains packet metadata, and 'packet' contains packet data
         } else if (returnValue == 0) {
@@ -204,11 +204,11 @@ bool pcap_analyser_udp(const char* pcap_file, bool show_packet_data){
     while (int returnValue = pcap_next_ex(handle, &header, &packet)) {
         
         if (returnValue == 1) {
-            cout<<"----------------------------------------------------------------------------";
+            cout<<"----------------------------------------------------------------------------"<<endl;
             cout<<"UDP PACKET:"<<endl;
             extract_ip_info(header, packet);
             if(show_packet_data) process_packet(header,packet);
-            cout<<"----------------------------------------------------------------------------";
+            cout<<"----------------------------------------------------------------------------"<<endl;
             // Process packet here
             // 'header' contains packet metadata, and 'packet' contains packet data
         } else if (returnValue == 0) {
@@ -256,10 +256,10 @@ bool pcap_analyser_ipv4(const char* pcap_file, bool show_packet_data) {
 
     while (int returnValue = pcap_next_ex(handle, &header, &packet)) {
         if (returnValue == 1) {
-            cout<<"----------------------------------------------------------------------------";
+            cout<<"----------------------------------------------------------------------------"<<endl;
             extract_ip_info(header, packet);
             if(show_packet_data) process_packet(header,packet);
-            cout<<"----------------------------------------------------------------------------";
+            cout<<"----------------------------------------------------------------------------"<<endl;
             // Process IPv4 packet here
             // 'header' contains packet metadata, and 'packet' contains packet data
         } else if (returnValue == 0) {
@@ -307,10 +307,10 @@ bool pcap_analyser_ipv6(const char* pcap_file, bool show_packet_data) {
 
     while (int returnValue = pcap_next_ex(handle, &header, &packet)) {
         if (returnValue == 1) {
-            cout<<"----------------------------------------------------------------------------";
+            cout<<"----------------------------------------------------------------------------"<<endl;
             extract_ip_info(header, packet);
             if(show_packet_data) process_packet(header,packet);
-            cout<<"----------------------------------------------------------------------------";
+            cout<<"----------------------------------------------------------------------------"<<endl;
             // Process IPv6 packet here
             // 'header' contains packet metadata, and 'packet' contains packet data
         } else if (returnValue == 0) {
@@ -360,11 +360,11 @@ bool pcap_analyser_udp_icmp(const char* pcap_file, bool show_packet_data) {
         if (returnValue == 1) {
             if (header->len > 14) { // Skip Ethernet frames (14 bytes) to process IP packets
                 if (packet[12] == 0x08 && packet[13] == 0x00) {
-                    cout<<"----------------------------------------------------------------------------";
+                    cout<<"----------------------------------------------------------------------------"<<endl;
                     cout<<"ICMP PACKET:"<<endl;
                     extract_ip_info(header, packet);
                     if(show_packet_data) process_packet(header,packet);
-                    cout<<"----------------------------------------------------------------------------";
+                    cout<<"----------------------------------------------------------------------------"<<endl;
                     // Process IP packets here
                     // 'header' contains packet metadata, and 'packet' contains packet data
                 }
@@ -416,10 +416,10 @@ void filter_packets_by_source_ip(const char* pcap_file, const char* source_ip, b
 
     while (int returnValue = pcap_next_ex(handle, &header, &packet)) {
         if (returnValue == 1) {
-            cout<<"----------------------------------------------------------------------------";
+            cout<<"----------------------------------------------------------------------------"<<endl;
             extract_ip_info(header, packet);
             if(show_packet_data) process_packet(header,packet);
-            cout<<"----------------------------------------------------------------------------";
+            cout<<"----------------------------------------------------------------------------"<<endl;
         } else if (returnValue == 0) {
             // Timeout elapsed
         } else if (returnValue == -1) {
