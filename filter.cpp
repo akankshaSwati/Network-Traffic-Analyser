@@ -538,10 +538,68 @@ int main() {
     cin>>s;
     cout<<"Analyzing "<<s<< "........"<<endl;
     const char* pcap_file = s.c_str();
-    const char* source_ip = "10.38.1.54";
-    const char* dest_ip = "239.255.255.250";
-    bool show_packet_data = 1;
-    // filter_packets_by_dest_ip(pcap_file, dest_ip, show_packet_data);
-    filter_packets_by_source_and_dest_ip(pcap_file, source_ip, dest_ip, show_packet_data);
+
+    while(1){
+        cout<<"Do you want to filter packets based on Protocols or IP addresses?\nEnter p or P for protocol\nEnter i or I for IP address"<<endl;
+        char c; cin>>c;
+    
+        if(c=='p'||c=='P'){
+            cout<<"Choose a protocol among the given to filter packets: "<<endl;
+            cout<<"Type the index no. for using the corresponding protocol filter:"<<endl;
+            cout<<"1 - tcp\n2 - udp\n3 - icmp\n4 - ipv4\n5 - ipv6"<<endl;
+            int n;
+            cin>>n;
+            cout<<"Do you want to print Packet data? Print y / Y for YES and n / N / (any other value) for NO !"<<endl;
+            bool show_packet_data = 0;
+            char b; cin>>b;
+            if(b=='y'||b=='Y') show_packet_data = 1;
+            
+            if(n==1) pcap_analyser_tcp(pcap_file , show_packet_data);
+            else if(n==2) pcap_analyser_udp(pcap_file , show_packet_data);
+            else if(n==3) pcap_analyser_udp_icmp(pcap_file , show_packet_data);
+            else if(n==4) pcap_analyser_ipv4(pcap_file , show_packet_data);
+            else if(n==5) pcap_analyser_ipv6(pcap_file , show_packet_data);
+            else {
+                cout<<"Invalid Input!!! Try Again!!!"<<endl;
+                continue;
+            }
+
+            break;
+        }
+        else if(c=='i'||c=='I'){
+            cout<<"Do you want to filter by:\n1 - Source IP\n2 - Destination IP\n3 - Both?\nEnter the Index no.: "<<endl;
+            int n; cin>>n;
+            cout<<"Do you want to print Packet data? Print y / Y for YES and n / N / (any other value) for NO !"<<endl;
+            bool show_packet_data = 0;
+            char b; cin>>b;
+            if(b=='y'||b=='Y') show_packet_data = 1;
+            if(n==1){
+                string source;
+                cout<<"Enter Source IP:"<<endl;
+                cin>>source;
+                filter_packets_by_source_ip(pcap_file, source.c_str(),show_packet_data);
+            }
+            else if(n==2){
+                string dest;
+                cout<<"Enter Destination IP:"<<endl;
+                cin>>dest;
+                filter_packets_by_dest_ip(pcap_file, dest.c_str(),show_packet_data);
+            }
+            else if(n==3){
+                string source,dest;
+                cout<<"Enter Source IP:"<<endl;
+                cin>>source;
+                cout<<"Enter Destination IP:"<<endl;
+                cin>>dest;
+                filter_packets_by_source_and_dest_ip(pcap_file, source.c_str(),dest.c_str(),show_packet_data);
+            }
+            else{
+                cout<<"Invalid Input!!! Try Again!!!"<<endl;
+                continue;
+            }
+            break;
+        }
+        cout<<"Wrong Input!!! Try Again!!!";
+    }
     return 0;
 }
