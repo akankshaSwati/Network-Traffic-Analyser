@@ -18,37 +18,57 @@
 #include<unistd.h>
 #include<signal.h>
 #include<iostream>
+#include<string>
+#include<cstdint>
 
-bool shouldRun = true;  // Initialize a flag
+bool sniffPackets = true;
 
 void SignalHandler(int signum) {
     if (signum == SIGINT) {
-        shouldRun = false;
-        printf("Received SIGINT. Stopping the capturing of packets.....................................\r\n");
+        sniffPackets = false;
+		printf("_______________________________________________________________________________\r\n");
+        printf("Received SIGINT!!\nSniffing halted.\n");
         return;
     }
 }
-void ProcessPacket(unsigned char* , int);
-void print_ip_header(unsigned char* , int);
-void print_tcp_packet(unsigned char * , int );
-void print_udp_packet(unsigned char * , int );
-void print_icmp_packet(unsigned char* , int );
-void PrintData (unsigned char* , int);
 
 FILE *logfile;
 struct sockaddr_in source,dest;
 int tcp=0,udp=0,icmp=0,others=0,igmp=0,total=0,i,j;	
 
-void ProcessPacket(unsigned char* buffer, int size)
-{
-	//Get the IP Header part of this packet , excluding the ethernet header
+struct FilterParams{
+	std::pair<std::string,std::string> protocol;
+	std::string source_ip;
+	std::string destination_ip;
+	int source_port;
+	int destination_port;
+
+	FilterParams()
+	: protocol({"all","all"}), source_ip("any"), destination_ip("any"), source_port(0), destination_port(0)
+	{}
+};
+
+void ProcessPacket(unsigned char* , int, FilterParams*);
+bool print_ip_header(unsigned char* , int, FilterParams*);
+void print_tcp_packet(unsigned char * , int, FilterParams*);
+void print_udp_packet(unsigned char * , int, FilterParams*);
+void print_icmp_packet(unsigned char* , int, FilterParams*);
+void PrintData (unsigned char* , int);
+
+void ProcessPacket(unsigned char* buffer, int size, FilterParams* f_params){
+
+	// Extract IP Header, excluding the ethernet header
 	struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
+	
 	++total;
-	switch (iph->protocol) //Check the Protocol and do accordingly...
+	switch (iph->protocol) //Check the Protocol
 	{
 		case 1:  //ICMP Protocol
 			++icmp;
-			print_icmp_packet( buffer , size);
+			if(f_params->protocol.second=="all" || f_params->protocol.second=="icmp")
+			{
+				print_icmp_packet(buffer , size, f_params);
+			}
 			break;
 		
 		case 2:  //IGMP Protocol
@@ -57,18 +77,25 @@ void ProcessPacket(unsigned char* buffer, int size)
 		
 		case 6:  //TCP Protocol
 			++tcp;
-			print_tcp_packet(buffer , size);
+			if(f_params->protocol.second=="all" || f_params->protocol.second=="tcp")
+			{
+				print_tcp_packet(buffer , size, f_params);
+			}
 			break;
 		
 		case 17: //UDP Protocol
 			++udp;
-			print_udp_packet(buffer , size);
+			if(f_params->protocol.second=="all" || f_params->protocol.second=="udp")
+			{
+				print_udp_packet(buffer , size, f_params);
+			}
 			break;
 		
 		default: //Some Other Protocol like ARP etc.
 			++others;
 			break;
 	}
+
 	printf("TCP : %d   UDP : %d   ICMP : %d   IGMP : %d   Others : %d   Total : %d\r", tcp , udp , icmp , igmp , others , total);
 }
 
@@ -83,10 +110,8 @@ void print_ethernet_header(unsigned char* Buffer, int Size)
 	fprintf(logfile , "   |-Protocol            : %u \n",(unsigned short)eth->h_proto);
 }
 
-void print_ip_header(unsigned char* Buffer, int Size)
-{
-	print_ethernet_header(Buffer , Size);
-  
+bool print_ip_header(unsigned char* Buffer, int Size, FilterParams* f_params)
+{ 
 	unsigned short iphdrlen;
 		
 	struct iphdr *iph = (struct iphdr *)(Buffer  + sizeof(struct ethhdr) );
@@ -97,6 +122,30 @@ void print_ip_header(unsigned char* Buffer, int Size)
 	
 	memset(&dest, 0, sizeof(dest));
 	dest.sin_addr.s_addr = iph->daddr;
+
+	if(f_params->source_ip!="any" && f_params->source_ip!=inet_ntoa(source.sin_addr)) return false;
+	if(f_params->destination_ip!="any" && f_params->destination_ip!=inet_ntoa(dest.sin_addr)) return false;
+
+	switch (iph->protocol)
+	{
+		case 1:  //ICMP Protocol
+			fprintf(logfile , "\n\n***********************ICMP Packet*************************\n");
+			break;
+		case 2:  //IGMP Protocol
+			fprintf(logfile , "\n\n***********************IGMP Packet*************************\n");
+			break;
+		case 6:  //TCP Protocol
+			fprintf(logfile , "\n\n***********************TCP Packet*************************\n");
+			break;
+		case 17: //UDP Protocol
+			fprintf(logfile , "\n\n***********************UDP Packet*************************\n");
+			break;
+		default: //Some Other Protocol like ARP etc.
+			fprintf(logfile , "\n\n***********************Packet*************************\n");
+			break;
+	}
+
+	print_ethernet_header(Buffer , Size);
 	
 	fprintf(logfile , "\n");
 	fprintf(logfile , "IP Header\n");
@@ -105,17 +154,16 @@ void print_ip_header(unsigned char* Buffer, int Size)
 	fprintf(logfile , "   |-Type Of Service   : %d\n",(unsigned int)iph->tos);
 	fprintf(logfile , "   |-IP Total Length   : %d  Bytes(Size of Packet)\n",ntohs(iph->tot_len));
 	fprintf(logfile , "   |-Identification    : %d\n",ntohs(iph->id));
-	//fprintf(logfile , "   |-Reserved ZERO Field   : %d\n",(unsigned int)iphdr->ip_reserved_zero);
-	//fprintf(logfile , "   |-Dont Fragment Field   : %d\n",(unsigned int)iphdr->ip_dont_fragment);
-	//fprintf(logfile , "   |-More Fragment Field   : %d\n",(unsigned int)iphdr->ip_more_fragment);
 	fprintf(logfile , "   |-TTL      : %d\n",(unsigned int)iph->ttl);
 	fprintf(logfile , "   |-Protocol : %d\n",(unsigned int)iph->protocol);
 	fprintf(logfile , "   |-Checksum : %d\n",ntohs(iph->check));
 	fprintf(logfile , "   |-Source IP        : %s\n",inet_ntoa(source.sin_addr));
 	fprintf(logfile , "   |-Destination IP   : %s\n",inet_ntoa(dest.sin_addr));
+
+	return true;
 }
 
-void print_tcp_packet(unsigned char* Buffer, int Size)
+void print_tcp_packet(unsigned char* Buffer, int Size, FilterParams* f_params)
 {
 	unsigned short iphdrlen;
 	
@@ -125,11 +173,11 @@ void print_tcp_packet(unsigned char* Buffer, int Size)
 	struct tcphdr *tcph=(struct tcphdr*)(Buffer + iphdrlen + sizeof(struct ethhdr));
 			
 	int header_size =  sizeof(struct ethhdr) + iphdrlen + tcph->doff*4;
+		
+	if(!print_ip_header(Buffer, Size, f_params)) return;
+	if(f_params->source_port && f_params->source_port!=static_cast<int>(ntohs(tcph->source))) return;
+	if(f_params->destination_port && f_params->destination_port!=static_cast<int>(ntohs(tcph->dest))) return;
 	
-	fprintf(logfile , "\n\n***********************TCP Packet*************************\n");	
-		
-	print_ip_header(Buffer,Size);
-		
 	fprintf(logfile , "\n");
 	fprintf(logfile , "TCP Header\n");
 	fprintf(logfile , "   |-Source Port      : %u\n",ntohs(tcph->source));
@@ -137,8 +185,6 @@ void print_tcp_packet(unsigned char* Buffer, int Size)
 	fprintf(logfile , "   |-Sequence Number    : %u\n",ntohl(tcph->seq));
 	fprintf(logfile , "   |-Acknowledge Number : %u\n",ntohl(tcph->ack_seq));
 	fprintf(logfile , "   |-Header Length      : %d DWORDS or %d BYTES\n" ,(unsigned int)tcph->doff,(unsigned int)tcph->doff*4);
-	//fprintf(logfile , "   |-CWR Flag : %d\n",(unsigned int)tcph->cwr);
-	//fprintf(logfile , "   |-ECN Flag : %d\n",(unsigned int)tcph->ece);
 	fprintf(logfile , "   |-Urgent Flag          : %d\n",(unsigned int)tcph->urg);
 	fprintf(logfile , "   |-Acknowledgement Flag : %d\n",(unsigned int)tcph->ack);
 	fprintf(logfile , "   |-Push Flag            : %d\n",(unsigned int)tcph->psh);
@@ -164,7 +210,7 @@ void print_tcp_packet(unsigned char* Buffer, int Size)
 	fprintf(logfile , "\n###########################################################");
 }
 
-void print_udp_packet(unsigned char *Buffer , int Size)
+void print_udp_packet(unsigned char *Buffer , int Size, FilterParams* f_params)
 {
 	
 	unsigned short iphdrlen;
@@ -176,9 +222,9 @@ void print_udp_packet(unsigned char *Buffer , int Size)
 	
 	int header_size =  sizeof(struct ethhdr) + iphdrlen + sizeof udph;
 	
-	fprintf(logfile , "\n\n***********************UDP Packet*************************\n");
-	
-	print_ip_header(Buffer,Size);			
+	if(!print_ip_header(Buffer, Size, f_params)) return;
+	if(f_params->source_port && f_params->source_port!=static_cast<int>(ntohs(udph->source))) return;
+	if(f_params->destination_port && f_params->destination_port!=static_cast<int>(ntohs(udph->dest))) return;
 	
 	fprintf(logfile , "\nUDP Header\n");
 	fprintf(logfile , "   |-Source Port      : %d\n" , ntohs(udph->source));
@@ -195,13 +241,12 @@ void print_udp_packet(unsigned char *Buffer , int Size)
 		
 	fprintf(logfile , "Data Payload\n");	
 	
-	//Move the pointer ahead and reduce the size of string
 	PrintData(Buffer + header_size , Size - header_size);
 	
 	fprintf(logfile , "\n###########################################################");
 }
 
-void print_icmp_packet(unsigned char* Buffer , int Size)
+void print_icmp_packet(unsigned char* Buffer , int Size, FilterParams* f_params)
 {
 	unsigned short iphdrlen;
 	
@@ -212,9 +257,7 @@ void print_icmp_packet(unsigned char* Buffer , int Size)
 	
 	int header_size =  sizeof(struct ethhdr) + iphdrlen + sizeof icmph;
 	
-	fprintf(logfile , "\n\n***********************ICMP Packet*************************\n");	
-	
-	print_ip_header(Buffer , Size);
+	if(!print_ip_header(Buffer, Size, f_params)) return;
 			
 	fprintf(logfile , "\n");
 		
@@ -232,8 +275,6 @@ void print_icmp_packet(unsigned char* Buffer , int Size)
 	
 	fprintf(logfile , "   |-Code : %d\n",(unsigned int)(icmph->code));
 	fprintf(logfile , "   |-Checksum : %d\n",ntohs(icmph->checksum));
-	//fprintf(logfile , "   |-ID       : %d\n",ntohs(icmph->id));
-	//fprintf(logfile , "   |-Sequence : %d\n",ntohs(icmph->sequence));
 	fprintf(logfile , "\n");
 
 	fprintf(logfile , "IP Header\n");
@@ -244,7 +285,6 @@ void print_icmp_packet(unsigned char* Buffer , int Size)
 		
 	fprintf(logfile , "Data Payload\n");	
 	
-	//Move the pointer ahead and reduce the size of string
 	PrintData(Buffer + header_size , (Size - header_size) );
 	
 	fprintf(logfile , "\n###########################################################");
@@ -297,44 +337,107 @@ void PrintData (unsigned char* data , int Size)
 	}
 }
 
-int main()
+void toLower(std::string &s){
+	int l = s.length();
+	for(int i=0; i<l; i++) s[i]=tolower(s[i]);
+}
+
+int main(int argc, char* argv[])
 {
-	int saddr_size , data_size;
-	struct sockaddr saddr;
+	int proto;
+	int sock_raw;
+	int source_addr_size , data_size;
+	struct sockaddr_in source_addr, dest_addr;
 	
-	unsigned char *buffer = (unsigned char *) malloc(65536); //Its Big!
+	unsigned char *buffer = (unsigned char *) malloc(65536);
+
 	signal(SIGINT, SignalHandler);
-	logfile=fopen("log.txt","w");
-	if(logfile==NULL) 
-	{
-		printf("Unable to create log.txt file.");
+
+	logfile = fopen("analysis.txt","w");
+	if(logfile==NULL){
+		perror("Unable to create analysis.txt file");
+		exit(EXIT_FAILURE);
 	}
-	printf("Starting...\n");
+	printf("Sniffing...\n");
 	
-	int sock_raw = socket( AF_PACKET , SOCK_RAW , htons(ETH_P_ALL)) ;
-	//setsockopt(sock_raw , SOL_SOCKET , SO_BINDTODEVICE , "eth0" , strlen("eth0")+ 1 );
-	
-	if(sock_raw < 0)
+	FilterParams* f_params = new FilterParams();
+	if(argc>1)
 	{
-		//Print the error with proper message
-		perror("Socket Error");
-		return 1;
-	}
-	while(shouldRun)
-	{
-		saddr_size = sizeof saddr;
-		//Receive a packet
-		data_size = recvfrom(sock_raw , buffer , 65536 , 0 , &saddr , (socklen_t*)&saddr_size);
-		if(data_size <0 )
-		{
-			printf("Recvfrom error , failed to get packets\n");
-			return 1;
+		int i=1;
+		while(i<argc){
+			if(strcmp(argv[i],"-i")==0){
+				i++;
+				if(i<argc && argv[i][0]!='-'){
+					f_params->protocol.first = argv[i++];
+					toLower(f_params->protocol.first);
+				}
+				if(i<argc && argv[i][0]!='-'){
+					f_params->protocol.second = argv[i++];
+					toLower(f_params->protocol.second);
+				}
+			}
+			else if(strcmp(argv[i],"-s")==0){
+				i++;
+				if(i<argc && argv[i][0]!='-'){
+					f_params->source_ip = argv[i++];
+					toLower(f_params->source_ip);
+				}
+				if(i<argc && argv[i][0]!='-'){
+					f_params->source_port = std::stoi(argv[i++]);
+				}
+			}
+			else if(strcmp(argv[i],"-d")==0){
+				i++;
+				if(i<argc && argv[i][0]!='-'){
+					f_params->destination_ip = argv[i++];
+					toLower(f_params->destination_ip);
+				}
+				if(i<argc && argv[i][0]!='-'){
+					f_params->destination_port = std::stoi(argv[i++]);
+				}
+			}
+			else{
+				std::cout<<"Cannot identify the arguement type. Dropping the argument. . ."<<std::endl;
+				i++;
+			}
 		}
-		//Now process the packet
-		ProcessPacket(buffer , data_size);
+	}
+
+	if(f_params->protocol.first=="all"){
+		proto = ETH_P_ALL;
+	}
+	if(f_params->protocol.first=="ipv4"){
+		proto = ETH_P_IP;
+	}
+	if(f_params->protocol.first=="ipv6"){
+		proto = ETH_P_IPV6;
+	}
+	if(f_params->protocol.first=="arp"){
+		proto = ETH_P_ARP;
+	}
+	
+	if((sock_raw = socket(AF_PACKET , SOCK_RAW , htons(proto))) < 0){
+		perror("Socket Error");
+		exit(EXIT_FAILURE);
+	}
+
+	bzero(&source_addr, sizeof(source_addr));
+	bzero(&dest_addr, sizeof(dest_addr));
+
+	while(sniffPackets){
+		source_addr_size = sizeof(source_addr);
+		
+		data_size = recvfrom(sock_raw , buffer , 65536 , 0 , (struct sockaddr*)&source_addr , (socklen_t*)&source_addr_size);
+
+		if(data_size < 0){
+			perror("Failed to receive packets\n");
+			exit(EXIT_FAILURE);
+		}
+		
+		ProcessPacket(buffer , data_size, f_params);
 	}
     close(sock_raw);
-	printf("```````Packets processed and log file generated``````` \n\r");
-	printf("Finished\n");
+	printf("TCP : %d   UDP : %d   ICMP : %d   IGMP : %d   Others : %d   Total : %d\n", tcp , udp , icmp , igmp , others , total);
+	printf("B-Bye!!\n");
 	return 0;
 }
