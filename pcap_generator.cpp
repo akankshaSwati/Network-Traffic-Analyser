@@ -76,6 +76,7 @@ void write_pcap_file(const char* filename, vector<unsigned char>& packet_data) {
 
 int main() {
     char errbuf[PCAP_ERRBUF_SIZE];
+    ofstream file("input.txt");
     ifstream input_file("input.txt");
     if (!input_file) {
         cerr << "Failed to open input file." << endl;
