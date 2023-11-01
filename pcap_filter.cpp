@@ -135,7 +135,7 @@ bool pcap_analyser_tcp(const char* pcap_file, bool show_packet_data){
     }
 
     struct bpf_program fp;
-    char filter_exp[] = "tcp port 80";
+    char filter_exp[] = "tcp";
 
     if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
         fprintf(stderr, "Error compiling filter: %s\n", pcap_geterr(handle));
