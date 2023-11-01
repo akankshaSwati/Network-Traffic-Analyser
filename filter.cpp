@@ -1,4 +1,5 @@
 #include <cstring>
+#include <ctime>
 #include <iostream>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -8,11 +9,25 @@
 
 using namespace std;
 
-void process_packet(const struct pcap_pkthdr* header, const u_char* packet_data) {
-    // You can process or print the packet data here
-    printf("Packet Length: %d\n", header->len);
+void print_packet_timestamp(const struct pcap_pkthdr* header) {
+    time_t timestamp = header->ts.tv_sec;
+    struct tm timeinfo;
 
-    // Print the packet data as hexadecimal bytes
+    if (localtime_r(&timestamp, &timeinfo)) {
+        char time_str[64];
+        strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        printf("Timestamp: %s.%06ld\n", time_str, header->ts.tv_usec);
+    } else {
+        printf("Error converting timestamp to human-readable format\n");
+    }
+}
+
+void process_packet(const struct pcap_pkthdr* header, const u_char* packet_data) {
+    // Print the packet length in bytes
+    printf("Packet Cap Length: %u bytes\n", header->caplen);
+    printf("Packet Length: %u bytes\n", header->len);
+    print_packet_timestamp(header);
+    printf("\n");
     for (int i = 0; i < header->len; i++) {
         printf("%02X ", packet_data[i]);
         if ((i + 1) % 16 == 0) {
@@ -467,11 +482,62 @@ void filter_packets_by_dest_ip(const char* pcap_file, const char* dest_ip, bool 
     pcap_close(handle);
 }
 
+void filter_packets_by_source_and_dest_ip(const char* pcap_file, const char* source_ip, const char* dest_ip, bool show_packet_data) {
+    pcap_t* handle;
+    char errbuf[PCAP_ERRBUF_SIZE];
+
+    handle = pcap_open_offline(pcap_file, errbuf);
+    if (handle == NULL) {
+        fprintf(stderr, "Error opening pcap file: %s\n", errbuf);
+        return;
+    }
+
+    struct bpf_program fp;
+
+    // Construct the filter expression to capture packets with the specified source and destination IP
+    char filter_exp[400]; // Adjust the size as needed
+    snprintf(filter_exp, sizeof(filter_exp), "src host %s and dst host %s", source_ip, dest_ip);
+
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        fprintf(stderr, "Error compiling filter: %s\n", pcap_geterr(handle));
+        pcap_close(handle);
+        return;
+    }
+
+    if (pcap_setfilter(handle, &fp) == -1) {
+        fprintf(stderr, "Error setting filter: %s\n", pcap_geterr(handle));
+        pcap_close(handle);
+        return;
+    }
+
+    struct pcap_pkthdr* header;
+    const u_char* packet;
+
+    while (int returnValue = pcap_next_ex(handle, &header, &packet)) {
+        if (returnValue == 1) {
+            cout << "----------------------------------------------------------------------------" << endl;
+            extract_ip_info(header, packet);
+            if (show_packet_data) process_packet(header, packet);
+            cout << "----------------------------------------------------------------------------" << endl;
+        } else if (returnValue == 0) {
+            // Timeout elapsed (if required)
+        } else if (returnValue == -1) {
+            fprintf(stderr, "Error reading the next packet: %s\n", pcap_geterr(handle));
+            break;
+        } else if (returnValue == -2) {
+            // End of file reached
+            break;
+        }
+    }
+    pcap_close(handle);
+}
+
 int main() {
     const char* pcap_file = "wire.pcap";
-    const char* source_ip = "142.250.82.148";
-    const char* dest_ip = "142.250.82.148";
+    const char* source_ip = "10.38.1.54";
+    const char* dest_ip = "239.255.255.250";
     bool show_packet_data = 0;
-    filter_packets_by_dest_ip(pcap_file, dest_ip, show_packet_data);
+    // filter_packets_by_dest_ip(pcap_file, dest_ip, show_packet_data);
+    filter_packets_by_source_and_dest_ip(pcap_file, source_ip, dest_ip, 1);
     return 0;
 }
