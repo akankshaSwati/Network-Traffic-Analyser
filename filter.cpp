@@ -533,7 +533,11 @@ void filter_packets_by_source_and_dest_ip(const char* pcap_file, const char* sou
 }
 
 int main() {
-    const char* pcap_file = "wire.pcap";
+    string s;
+    cout<<"Enter the name with extension of the .pcap file you want to analyze."
+    cin>>s;
+    cout<<"Analyzing "<<s<< "........"<<endl;
+    const char* pcap_file = s.c_str();
     const char* source_ip = "10.38.1.54";
     const char* dest_ip = "239.255.255.250";
     bool show_packet_data = 0;
