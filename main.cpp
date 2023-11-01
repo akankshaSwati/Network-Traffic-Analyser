@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
         if(way=='s' || way =='S')
         {
             // Compile the external_program.cpp
-            const char* compileSniffer = "g++ sniffer.cpp -o sniffer";
+            const char* compileSniffer = "g++ sniffer_filter_analyser.cpp -o sniffer";
 
             // Execute the compilation command
             int compileSnifferResult = system(compileSniffer);
@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
                 string filters ="./sniffer";
                 if(argc<2)
                 {
-                    std::cout << "No filter criteria found. All the packets in the pcap file will be displayed." << std::endl;
+                    std::cout << "No filter criteria found. All the packets will be displayed." << std::endl;
                 }
                 else
                 {
@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
         else if(way=='f' || way=='F')
         {
             //Compiling Filter.cpp
-            const char* compileFilter = "g++ filter.cpp -o filter -lpcap";
+            const char* compileFilter = "g++ pcap_filter.cpp -o filter -lpcap";
             int compileFilterResult = system(compileFilter);
             if (compileFilterResult == 0) 
             {
