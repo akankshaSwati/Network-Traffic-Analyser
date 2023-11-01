@@ -9,6 +9,18 @@
 
 using namespace std;
 
+struct FilterParams{
+	std::pair<std::string,std::string> protocol;
+	std::string source_ip;
+	std::string destination_ip;
+	int source_port;
+	int destination_port;
+
+	FilterParams()
+	: protocol({"all","all"}), source_ip("any"), destination_ip("any"), source_port(0), destination_port(0)
+	{}
+};
+
 void print_packet_timestamp(const struct pcap_pkthdr* header) {
     time_t timestamp = header->ts.tv_sec;
     struct tm timeinfo;
@@ -532,74 +544,71 @@ void filter_packets_by_source_and_dest_ip(const char* pcap_file, const char* sou
     pcap_close(handle);
 }
 
-int main() {
+int main(int argc, char* argv[]) 
+{
     string s;
     cout<<"Enter the name with extension of the .pcap file you want to analyze."<<endl;
     cin>>s;
     cout<<"Analyzing "<<s<< "........"<<endl;
     const char* pcap_file = s.c_str();
+    FilterParams* f_params = new FilterParams();
+    cout<<"Do you want to print Packet data? Print y / Y for YES and n / N / (any other value) for NO !"<<endl;
+    bool show_packet_data = 0;
+    char b; cin>>b;
+    if(b=='y'||b=='Y') show_packet_data = 1;
 
-    while(1){
-        cout<<"Do you want to filter packets based on Protocols or IP addresses?\nEnter p or P for protocol\nEnter i or I for IP address"<<endl;
-        char c; cin>>c;
-    
-        if(c=='p'||c=='P'){
-            cout<<"Choose a protocol among the given to filter packets: "<<endl;
-            cout<<"Type the index no. for using the corresponding protocol filter:"<<endl;
-            cout<<"1 - tcp\n2 - udp\n3 - icmp\n4 - ipv4\n5 - ipv6"<<endl;
-            int n;
-            cin>>n;
-            cout<<"Do you want to print Packet data? Print y / Y for YES and n / N / (any other value) for NO !"<<endl;
-            bool show_packet_data = 0;
-            char b; cin>>b;
-            if(b=='y'||b=='Y') show_packet_data = 1;
-            
-            if(n==1) pcap_analyser_tcp(pcap_file , show_packet_data);
-            else if(n==2) pcap_analyser_udp(pcap_file , show_packet_data);
-            else if(n==3) pcap_analyser_udp_icmp(pcap_file , show_packet_data);
-            else if(n==4) pcap_analyser_ipv4(pcap_file , show_packet_data);
-            else if(n==5) pcap_analyser_ipv6(pcap_file , show_packet_data);
-            else {
-                cout<<"Invalid Input!!! Try Again!!!"<<endl;
-                continue;
+    if(argc>1)
+    {
+        int i=1;
+        while(i<argc){
+            if(strcmp(argv[i],"-i")==0){
+                i++;
+                if(i<argc && argv[i][0]!='-'){
+                    if(strcmp(argv[i++], "tcp"));
+                    pcap_analyser_tcp(pcap_file , show_packet_data);
+                }
+                if(i<argc && argv[i][0]!='-'){
+                    if(strcmp(argv[i++], "udp"));
+                    pcap_analyser_udp(pcap_file , show_packet_data);
+                }
+                if(i<argc && argv[i][0]!='-'){
+                    if(strcmp(argv[i++], "icmp"));
+                    pcap_analyser_udp_icmp(pcap_file , show_packet_data);
+                }
+                if(i<argc && argv[i][0]!='-'){
+                    if(strcmp(argv[i++], "ipv4"));
+                    pcap_analyser_ipv4(pcap_file , show_packet_data);
+                }
+                if(i<argc && argv[i][0]!='-'){
+                    if(strcmp(argv[i++], "ipv6"));
+                    pcap_analyser_ipv6(pcap_file , show_packet_data);
+                }
             }
-
-            break;
-        }
-        else if(c=='i'||c=='I'){
-            cout<<"Do you want to filter by:\n1 - Source IP\n2 - Destination IP\n3 - Both?\nEnter the Index no.: "<<endl;
-            int n; cin>>n;
-            cout<<"Do you want to print Packet data? Print y / Y for YES and n / N / (any other value) for NO !"<<endl;
-            bool show_packet_data = 0;
-            char b; cin>>b;
-            if(b=='y'||b=='Y') show_packet_data = 1;
-            if(n==1){
-                string source;
-                cout<<"Enter Source IP:"<<endl;
-                cin>>source;
-                filter_packets_by_source_ip(pcap_file, source.c_str(),show_packet_data);
+            else if(strcmp(argv[i],"-s")==0){
+                i++;
+                if(i<argc && argv[i][0]!='-'){
+                    string source = argv[i++];
+                    filter_packets_by_source_ip(pcap_file, source.c_str(),show_packet_data);
+                }
+                if(i<argc && argv[i][0]!='-'){
+                    f_params->source_port = std::stoi(argv[i++]);
+                }
             }
-            else if(n==2){
-                string dest;
-                cout<<"Enter Destination IP:"<<endl;
-                cin>>dest;
-                filter_packets_by_dest_ip(pcap_file, dest.c_str(),show_packet_data);
-            }
-            else if(n==3){
-                string source,dest;
-                cout<<"Enter Source IP:"<<endl;
-                cin>>source;
-                cout<<"Enter Destination IP:"<<endl;
-                cin>>dest;
-                filter_packets_by_source_and_dest_ip(pcap_file, source.c_str(),dest.c_str(),show_packet_data);
+            else if(strcmp(argv[i],"-d")==0){
+                i++;
+                if(i<argc && argv[i][0]!='-'){
+                    string dest = argv[i++];
+                    filter_packets_by_dest_ip(pcap_file, dest.c_str(),show_packet_data);
+                }
+                if(i<argc && argv[i][0]!='-'){
+                    f_params->destination_port = std::stoi(argv[i++]);
+                }
             }
             else{
-                cout<<"Invalid Input!!! Try Again!!!"<<endl;
-                continue;
+                std::cout<<"Cannot identify the arguement type. Dropping the argument. . ."<<std::endl;
+                i++;
             }
-            break;
         }
-        cout<<"Wrong Input!!! Try Again!!!";
     }
     return 0;
 }
