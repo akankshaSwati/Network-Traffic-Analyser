@@ -564,23 +564,16 @@ int main(int argc, char* argv[])
             if(strcmp(argv[i],"-i")==0){
                 i++;
                 if(i<argc && argv[i][0]!='-'){
-                    if(strcmp(argv[i++], "tcp"));
+                    cout<<argv[i]<<"  ::: "<<endl;
+                    if(i<argc && strcmp(argv[i++], "tcp")==0 );
                     pcap_analyser_tcp(pcap_file , show_packet_data);
-                }
-                if(i<argc && argv[i][0]!='-'){
-                    if(strcmp(argv[i++], "udp"));
+                    if(i<argc && strcmp(argv[i++], "udp")==0 );
                     pcap_analyser_udp(pcap_file , show_packet_data);
-                }
-                if(i<argc && argv[i][0]!='-'){
-                    if(strcmp(argv[i++], "icmp"));
+                    if(i<argc && strcmp(argv[i++], "icmp")==0 );
                     pcap_analyser_udp_icmp(pcap_file , show_packet_data);
-                }
-                if(i<argc && argv[i][0]!='-'){
-                    if(strcmp(argv[i++], "ipv4"));
+                    if(i<argc && strcmp(argv[i++], "ipv4")==0);
                     pcap_analyser_ipv4(pcap_file , show_packet_data);
-                }
-                if(i<argc && argv[i][0]!='-'){
-                    if(strcmp(argv[i++], "ipv6"));
+                    if(i<argc && strcmp(argv[i++], "ipv6")==0);
                     pcap_analyser_ipv6(pcap_file , show_packet_data);
                 }
             }
@@ -590,18 +583,12 @@ int main(int argc, char* argv[])
                     string source = argv[i++];
                     filter_packets_by_source_ip(pcap_file, source.c_str(),show_packet_data);
                 }
-                if(i<argc && argv[i][0]!='-'){
-                    f_params->source_port = std::stoi(argv[i++]);
-                }
             }
             else if(strcmp(argv[i],"-d")==0){
                 i++;
                 if(i<argc && argv[i][0]!='-'){
                     string dest = argv[i++];
                     filter_packets_by_dest_ip(pcap_file, dest.c_str(),show_packet_data);
-                }
-                if(i<argc && argv[i][0]!='-'){
-                    f_params->destination_port = std::stoi(argv[i++]);
                 }
             }
             else{
