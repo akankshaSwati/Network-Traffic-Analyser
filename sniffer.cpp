@@ -18,51 +18,72 @@
 #include<unistd.h>
 #include<signal.h>
 #include<iostream>
+#include<string>
 
-bool shouldRun = true;  // Initialize a flag
+bool sniffPackets = true;
 
 void SignalHandler(int signum) {
     if (signum == SIGINT) {
-        shouldRun = false;
-        printf("Received SIGINT. Stopping the capturing of packets.....................................\r\n");
+        sniffPackets = false;
+        printf("Received SIGINT. Stopping the capturing of packets . . . . .\r\n");
         return;
     }
 }
-void ProcessPacket(unsigned char* , int);
-void print_ip_header(unsigned char* , int);
-void print_tcp_packet(unsigned char * , int );
-void print_udp_packet(unsigned char * , int );
-void print_icmp_packet(unsigned char* , int );
-void PrintData (unsigned char* , int);
 
 FILE *logfile;
 struct sockaddr_in source,dest;
 int tcp=0,udp=0,icmp=0,others=0,igmp=0,total=0,i,j;	
 
-void ProcessPacket(unsigned char* buffer, int size)
-{
+struct FilterParams{
+	std::pair<std::string,std::string> protocol;
+	std::string source_ip;
+	std::string destination_ip;
+	int source_port;
+	int destination_port;
+
+	FilterParams()
+	: protocol({"all","all"}), source_ip("any"), destination_ip("any"), source_port(0), destination_port(0)
+	{}
+};
+
+void ProcessPacket(unsigned char* buffer, int size, FilterParams* f_params){
+
 	//Get the IP Header part of this packet , excluding the ethernet header
 	struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
+	
 	++total;
 	switch (iph->protocol) //Check the Protocol and do accordingly...
 	{
 		case 1:  //ICMP Protocol
 			++icmp;
-			print_icmp_packet( buffer , size);
+			if(f_params->protocol.second=="all" || f_params->protocol.second=="icmp")
+			{
+				print_icmp_packet(buffer , size);
+			}
 			break;
 		
 		case 2:  //IGMP Protocol
 			++igmp;
+			if(f_params->protocol.second=="all" || f_params->protocol.second=="igmp")
+			{
+				// YOLO
+			}
 			break;
 		
 		case 6:  //TCP Protocol
 			++tcp;
-			print_tcp_packet(buffer , size);
+			if(f_params->protocol.second=="all" || f_params->protocol.second=="icmp")
+			{
+				print_tcp_packet(buffer , size);
+			}
 			break;
 		
 		case 17: //UDP Protocol
 			++udp;
-			print_udp_packet(buffer , size);
+			if(f_params->protocol.second=="all" || f_params->protocol.second=="icmp")
+			{
+				print_udp_packet(buffer , size);
+			}
 			break;
 		
 		default: //Some Other Protocol like ARP etc.
@@ -297,44 +318,131 @@ void PrintData (unsigned char* data , int Size)
 	}
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-	int saddr_size , data_size;
-	struct sockaddr saddr;
+	int proto;
+	int sock_raw;
+	int source_addr_size , data_size;
+	struct sockaddr_in source_addr, dest_addr;
 	
 	unsigned char *buffer = (unsigned char *) malloc(65536); //Its Big!
+
 	signal(SIGINT, SignalHandler);
-	logfile=fopen("log.txt","w");
-	if(logfile==NULL) 
-	{
-		printf("Unable to create log.txt file.");
-	}
-	printf("Starting...\n");
-	
-	int sock_raw = socket( AF_PACKET , SOCK_RAW , htons(ETH_P_ALL)) ;
-	//setsockopt(sock_raw , SOL_SOCKET , SO_BINDTODEVICE , "eth0" , strlen("eth0")+ 1 );
-	
-	if(sock_raw < 0)
-	{
-		//Print the error with proper message
-		perror("Socket Error");
+
+	logfile = fopen("analysis.txt","w");
+	if(logfile==NULL){
+		printf("Unable to create analysis.txt file.");
 		return 1;
 	}
-	while(shouldRun)
+	printf("Sniffing...\n");
+	
+	FilterParams* f_params = new FilterParams();
+	if(argc>1)
 	{
-		saddr_size = sizeof saddr;
-		//Receive a packet
-		data_size = recvfrom(sock_raw , buffer , 65536 , 0 , &saddr , (socklen_t*)&saddr_size);
-		if(data_size <0 )
-		{
-			printf("Recvfrom error , failed to get packets\n");
-			return 1;
+		int i=1;
+		while(i<argc){
+			if(argv[i++]=="-i"){
+				if(argv[i][0]!='-'){
+					f_params->protocol.first = argv[i++];
+					transform(f_params->protocol.first.begin(), f_params->protocol.first.end(), f_params->protocol.first.begin(), ::tolower);
+				}
+				if(argv[i][0]!='-'){
+					f_params->protocol.second = argv[i++];
+					transform(f_params->protocol.second.begin(), f_params->protocol.second.end(), f_params->protocol.second.begin(), ::tolower);
+				}
+			}
+			else if(argv[i++]=="-s"){
+				if(argv[i][0]!='-'){
+					f_params->source_ip = argv[i++];
+					transform(f_params->source_ip.begin(), f_params->source_ip.end(), f_params->source_ip.begin(), ::tolower);
+				}
+				if(argv[i][0]!='-'){
+					f_params->source_port = std::stoi(argv[i++]);
+				}
+			}
+			else if(argv[i++]=="-d"){
+				if(argv[i][0]!='-'){
+					f_params->destination_ip = argv[i++];
+					transform(f_params->destination_ip.begin(), f_params->destination_ip.end(), f_params->destination_ip.begin(), ::tolower);
+				}
+				if(argv[i][0]!='-'){
+					f_params->destination_port = std::stoi(argv[i++]);
+				}
+			}
+			else{
+				std::cout<<"Cannot identify the arguement type. Dropping the argument. . ."<<std::endl;
+				i++;
+			}
 		}
-		//Now process the packet
-		ProcessPacket(buffer , data_size);
+	}
+
+	if(f_params->protocol.first=="all"){
+		proto = ETH_P_ALL;
+	}
+	if(f_params->protocol.first=="ipv4"){
+		proto = ETH_P_IP;
+	}
+	if(f_params->protocol.first=="ipv6"){
+		proto = ETH_P_IPV6;
+	}
+	if(f_params->protocol.first=="arp"){
+		proto = ETH_P_ARP;
+	}
+	
+	if(sock_raw = socket(AF_PACKET , SOCK_RAW , htons(proto)) < 0){
+		perror("Socket Error");
+		exit(EXIT_FAILURE);
+	}
+
+	bzero(&source_addr, sizeof(source_addr));
+	bzero(&dest_addr, sizeof(dest_addr));
+
+	if(f_params->destination_ip != "any"){
+		dest_addr.sin_family = AF_PACKET;
+		if(inet_pton(AF_PACKET, (char *)(f_params->destination_ip.c_str()), &dest_addr.sin_addr) < 1) {
+			perror("Invalid destination ip address: Address not supported");
+        	exit(EXIT_FAILURE);
+    	}
+		if(f_params->destination_port){
+			dest_addr.sin_port = htons(f_params->destination_port);
+		}
+
+		if(bind(sock_raw, (struct sockaddr*)(&dest_addr), sizeof(dest_addr)) < 0){
+			perror("Binding to destination ip failed");
+        	exit(EXIT_FAILURE);
+		}
+	}
+
+	if(f_params->source_ip != "any"){
+		source_addr.sin_family = AF_PACKET;
+		if(inet_pton(AF_PACKET, (char *)(f_params->source_ip.c_str()), &source_addr.sin_addr) < 1) {
+			perror("Invalid source ip address: Address not supported");
+        	exit(EXIT_FAILURE);
+    	}
+		if(f_params->source_port){
+			source_addr.sin_port = htons(f_params->source_port);
+		}
+
+		if(connect(sock_raw, (struct sockaddr*)(&source_addr), sizeof(source_addr)) < 0){
+			perror("Connectinng to source ip failed");
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	while(sniffPackets){
+		source_addr_size = sizeof(source_addr);
+		
+		data_size = recvfrom(sock_raw , buffer , 65536 , 0 , (struct sockaddr*)&source_addr , (socklen_t*)&source_addr_size);
+
+		if(data_size < 0){
+			perror("Recvfrom error , failed to get packets\n");
+			exit(EXIT_FAILURE);
+		}
+		
+		ProcessPacket(buffer , data_size, f_params);
 	}
     close(sock_raw);
-	printf("```````Packets processed and log file generated``````` \n\r");
-	printf("Finished\n");
+	printf(". . . . . Packets processed and analysis file generated . . . . .\n\r");
+	printf("B-Bye!!\n");
 	return 0;
 }
