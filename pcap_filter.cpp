@@ -564,7 +564,6 @@ int main(int argc, char* argv[])
             if(strcmp(argv[i],"-i")==0){
                 i++;
                 if(i<argc && argv[i][0]!='-'){
-                    cout<<argv[i]<<"  ::: "<<endl;
                     if(i<argc && strcmp(argv[i++], "tcp")==0 );
                     pcap_analyser_tcp(pcap_file , show_packet_data);
                     if(i<argc && strcmp(argv[i++], "udp")==0 );
@@ -581,6 +580,7 @@ int main(int argc, char* argv[])
                 i++;
                 if(i<argc && argv[i][0]!='-'){
                     string source = argv[i++];
+                    cout<<"Packets with source IP: "<<source<<endl;
                     filter_packets_by_source_ip(pcap_file, source.c_str(),show_packet_data);
                 }
             }
@@ -588,6 +588,7 @@ int main(int argc, char* argv[])
                 i++;
                 if(i<argc && argv[i][0]!='-'){
                     string dest = argv[i++];
+                    cout<<"Packets with destination IP: "<<dest<<endl;
                     filter_packets_by_dest_ip(pcap_file, dest.c_str(),show_packet_data);
                 }
             }
