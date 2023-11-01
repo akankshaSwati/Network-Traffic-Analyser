@@ -35,11 +35,14 @@ $~ sudo ./main [OPTIONS]
 ```
 [OPTIONS] :
 -i `network protocol` `transport protocol` (both arguments being optional)
+
 -s `source ip address` `source port` (source ip address is required* to filter by source port)
+
 -d `destination ip address` `destination port` (destination ip address is required* to filter by destination port)
 
 PS: Any number of filters can be provided in the `OPTIONS` field
 
 ### Analysis
 Analysis for Sniffer-Filter-Analyser is provided in "analysis.txt"
+
 Analysis for Pcap-Filter is provided via terminal
