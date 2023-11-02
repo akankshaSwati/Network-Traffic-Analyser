@@ -27,22 +27,30 @@ Can simply download the .zip file through the `Code` button above.
 	$~ sudo ./main [OPTIONS]
 	```
 	PS: You need to run the program as root user, as the code includes creation of raw sockets.
+3. User will be prompted to input the tool, remaining program will proceed accordingly.
 	
 ### Filtration 
-For filtration of network packets, params can be provided through arguments while executing `main`
-```
-$~ sudo ./main [OPTIONS]
-```
-[OPTIONS] :
+1. Sniffer-Filter-Analyser
 
--i `network protocol` `transport protocol` (both arguments being optional)
+	For filtration of network packets, params can be provided through arguments while executing `main`
+	```
+	$~ sudo ./main [OPTIONS]
+	```
+	[OPTIONS] :
 
--s `source ip address` `source port` (source ip address is required* to filter by source port)
+	-i `network protocol`  `transport protocol` (both arguments being optional)
 
--d `destination ip address` `destination port` (destination ip address is required* to filter by destination port)
+	-s `source ip address`  `source port` (source ip address is required* to filter by source port)
 
+	-d `destination ip address`  `destination port` (destination ip address is required* to filter by destination port)
 
-PS: Any number of filters can be provided in the `OPTIONS` field
+	PS: Any number of filters can be provided in the `OPTIONS` field
+
+2. Pcap-Filter
+	Filter params are passed interactively while execution through the terminal, so `OPTIONS` field will be empty while using the pcap-filter feature.
+	```
+	$~ sudo ./main
+	```
 
 ### Analysis
 Analysis for Sniffer-Filter-Analyser is provided in "analysis.txt"
